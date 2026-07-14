@@ -63,6 +63,21 @@ button:disabled{opacity:.4;cursor:default}
 .wi-other .wi-k{font-size:11px;font-weight:500;color:#6b7280;margin-bottom:2px}
 .wi-other .wi-t{font-size:12px;line-height:1.5;color:#4b5563}
 .rv-note{font-size:12px;color:#d97706;margin-top:8px;padding:6px 10px;border-radius:8px;background:#fffbeb}
+.rv-add{margin-top:12px;padding-top:12px;border-top:0.5px solid #e5e7eb;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rv-add button{font-size:12px;color:#d97706;border-color:#fcd34d;background:#fffbeb;padding:6px 12px}
+.rv-add button:hover:not(:disabled){background:#fef3c7}
+.rv-add button:disabled{color:#059669;border-color:#6ee7b7;background:#f0fdf4;opacity:1}
+.rv-add-hint{font-size:11px;color:#9ca3af}
+.rvl-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:1rem}
+.rvl-title{font-size:15px;font-weight:500}
+.rvl-head button{font-size:12px}
+.rvl-empty{text-align:center;color:#6b7280;font-size:13px;padding:2.5rem 0}
+.rvl-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:0.5px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px}
+.rvl-main{flex:1;min-width:0}
+.rvl-meta{font-size:11px;color:#9ca3af;margin-bottom:3px}
+.rvl-text{font-size:13px;line-height:1.55;margin-bottom:4px}
+.rvl-status{font-size:11px;color:#d97706}
+.rvl-del{font-size:11px;color:#dc2626;border-color:#fca5a5;padding:5px 10px;white-space:nowrap}
 .sc{text-align:center;padding:1.5rem 0.5rem}
 .sc-num{font-size:48px;font-weight:500;margin:.75rem 0 .5rem}
 .sc-lbl{font-size:14px;color:#6b7280;margin-bottom:1.25rem}
@@ -123,8 +138,8 @@ button:disabled{opacity:.4;cursor:default}
   <div class="stats-row">
     <div class="stat"><div class="stat-n" id="s-ok" style="color:#059669">0</div><div class="stat-l">正解</div></div>
     <div class="stat"><div class="stat-n" id="s-ng" style="color:#dc2626">0</div><div class="stat-l">不正解</div></div>
-    <div class="stat"><div class="stat-n" id="s-done" style="color:#0f766e">0/0</div><div class="stat-l">完了済み</div></div>
-    <div class="stat"><div class="stat-n" id="s-rv" style="color:#d97706">0</div><div class="stat-l">復習待ち</div></div>
+    <div class="stat" id="stat-done"><div class="stat-n" id="s-done" style="color:#0f766e">0/0</div><div class="stat-l">完了済み</div></div>
+    <div class="stat" id="stat-rv"><div class="stat-n" id="s-rv" style="color:#d97706">0</div><div class="stat-l">復習待ち</div></div>
   </div>
   <div id="notify" style="display:none"></div>
   <div id="qc"></div>
@@ -236,6 +251,7 @@ function buildSession(){
 
   // queueが空 = 選択分野に新規・復習問題なし
   if(queue.length === 0){
+    setSummaryVisible(true);
     const fieldWrong = Object.keys(wrongMap).filter(inField).length;
     const label = field==='all' ? '全問題' : '「'+TH[field]+'」の問題';
     document.getElementById('qc').innerHTML=
@@ -247,7 +263,10 @@ function buildSession(){
             ? '復習待ち ' + fieldWrong + ' 問があります。もう少しで出題されます。'
             : (field!=='all' ? '別の分野に切り替えて学習を続けましょう。' : '新しい問題が追加されるまでお待ちください。')) +
         '</div>' +
-        '<button onclick="resetAll()" style="font-size:12px;color:#dc2626;border-color:#fca5a5">記録をリセット</button>' +
+        '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+          '<button onclick="showReviewList()" style="font-size:12px;color:#d97706;border-color:#fcd34d">復習待ちリスト</button>' +
+          '<button onclick="resetAll()" style="font-size:12px;color:#dc2626;border-color:#fca5a5">記録をリセット</button>' +
+        '</div>' +
       '</div>';
     updateHUD();
     return;
@@ -255,6 +274,16 @@ function buildSession(){
 
   updateHUD();
   renderQ();
+}
+
+// ── 上部サマリー(完了済み・復習待ち)の表示切替 ──
+// スマホは画面が狭いため、出題中は隠し20問終了時のみ表示する
+function setSummaryVisible(show){
+  const d=show?'':'none';
+  const ed=document.getElementById('stat-done');
+  const er=document.getElementById('stat-rv');
+  if(ed) ed.style.display=d;
+  if(er) er.style.display=d;
 }
 
 // ── HUD ──
@@ -273,11 +302,13 @@ function updateHUD(){
 // ── 問題描画 ──
 function renderQ(){
   if(pos >= queue.length){ showResult(); return; }
+  setSummaryVisible(false);
   const it=queue[pos]; const q=it.q;
   const isOx=q.type==="ox";
 
   document.getElementById('type-badge').textContent = isOx?'○×式':'三答択一式';
   document.getElementById('type-badge').className   = 'badge'+(isOx?'':' badge-warn');
+  document.getElementById('type-badge').style.display='';
   document.getElementById('diff-badge').textContent = DL[q.diff]||'';
   document.getElementById('diff-badge').className   = 'badge-diff '+(DC[q.diff]||'');
   document.getElementById('diff-badge').style.display='';
@@ -386,6 +417,10 @@ function answer(){
            <div class="esec-txt">${q.explanation}</div>
          </div>
          ${wHTML}
+         ${isOk?`<div class="rv-add">
+             <button id="rvAddBtn" onclick="addToReview('${q.id}')">🔖 この問題を復習に追加</button>
+             <span class="rv-add-hint">勘で正解した問題も復習できます</span>
+           </div>`:''}
        </div>
      </div>${rvNote}`;
 
@@ -394,13 +429,25 @@ function answer(){
   sbtn.disabled=false;
   sbtn.onclick=nextQ;
   updateHUD();
-  document.getElementById('expl').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('expl').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function nextQ(){ pos++; renderQ(); }
 
+// 正解した問題を手動で復習対象に追加(勘で正解したケース向け)
+function addToReview(id){
+  const wrongMap=getWrong();
+  const stats=getStats();
+  wrongMap[String(id)]={ target: stats.total + RV_AFTER };
+  lsSet('fp3_wrong', wrongMap);
+  const b=document.getElementById('rvAddBtn');
+  if(b){ b.textContent='復習に追加しました ✓'; b.disabled=true; }
+  updateHUD();
+}
+
 // ── セッション結果 ──
 function showResult(){
+  setSummaryVisible(true);
   document.getElementById('notify').style.display='none';
   document.getElementById('progress').style.width='100%';
   document.getElementById('type-badge').textContent='完了';
@@ -461,9 +508,58 @@ function showResult(){
          <div class="tgrid">${thRows}</div>`:''}
        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
          <button class="btn-p" onclick="buildSession()">次の20問へ →</button>
+         <button onclick="showReviewList()" style="font-size:12px;color:#d97706;border-color:#fcd34d">復習待ちリスト</button>
          <button onclick="resetAll()" style="font-size:12px;color:#dc2626;border-color:#fca5a5">記録をリセット</button>
        </div>
      </div>`;
+}
+
+// ── 復習待ちリスト ──
+function showReviewList(){
+  setSummaryVisible(true);
+  document.getElementById('notify').style.display='none';
+  document.getElementById('type-badge').style.display='none';
+  document.getElementById('diff-badge').style.display='none';
+  document.getElementById('q-counter').textContent='';
+
+  const wrongMap=getWrong();
+  const stats=getStats();
+  const now=stats.total;
+  const ids=Object.keys(wrongMap)
+    .filter(id=>byId(id))
+    .sort((a,b)=>wrongMap[a].target-wrongMap[b].target);
+
+  const rows=ids.map(id=>{
+    const q=byId(id);
+    const remain=Math.max(0, wrongMap[id].target-now);
+    const status=remain>0 ? 'あと'+remain+'問で出題' : '次回セッションで出題';
+    return `<div class="rvl-item">
+        <div class="rvl-main">
+          <div class="rvl-meta">${TH[q.theme]||q.theme} ・ ${DL[q.diff]||''}</div>
+          <div class="rvl-text">${q.text}</div>
+          <div class="rvl-status">${status}</div>
+        </div>
+        <button class="rvl-del" onclick="removeFromReview('${id}')">外す</button>
+      </div>`;
+  }).join('');
+
+  document.getElementById('qc').innerHTML=
+    `<div class="rvl">
+       <div class="rvl-head">
+         <span class="rvl-title">復習待ちリスト（${ids.length}問）</span>
+         <button onclick="buildSession()">← 学習に戻る</button>
+       </div>
+       ${ids.length ? rows
+         : '<div class="rvl-empty">復習待ちの問題はありません。</div>'}
+     </div>`;
+}
+
+function removeFromReview(id){
+  const wrongMap=getWrong();
+  delete wrongMap[String(id)];
+  lsSet('fp3_wrong', wrongMap);
+  updateHUD();
+  showReviewList();
 }
 
 function resetAll(){
