@@ -26,6 +26,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .pbar{height:3px;background:#e5e7eb;border-radius:2px;margin-bottom:1.25rem}
 .pfill{height:100%;background:#0f766e;border-radius:2px;transition:width .3s}
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem}
+/* 出題中は正解・不正解の2枚だけ表示するので、小さく左寄せにまとめる */
+.stats-row.hud-compact{grid-template-columns:repeat(2,minmax(0,110px));gap:6px}
+.stats-row.hud-compact .stat{padding:5px 10px}
+.stats-row.hud-compact .stat-n{font-size:14px}
+.stats-row.hud-compact .stat-l{font-size:9px}
 .stat{background:#f3f4f6;border-radius:8px;padding:8px 10px;text-align:center}
 .stat-n{font-size:17px;font-weight:500}.stat-l{font-size:10px;color:#6b7280;margin-top:2px}
 .rv-banner{font-size:12px;margin-bottom:1rem;padding:8px 12px;border-radius:8px;border:0.5px solid #fca5a5;background:#fef2f2;color:#dc2626}
@@ -67,17 +72,25 @@ button:disabled{opacity:.4;cursor:default}
 .rv-add button{font-size:12px;color:#d97706;border-color:#fcd34d;background:#fffbeb;padding:6px 12px}
 .rv-add button:hover:not(:disabled){background:#fef3c7}
 .rv-add button:disabled{color:#059669;border-color:#6ee7b7;background:#f0fdf4;opacity:1}
-.rv-add-hint{font-size:11px;color:#9ca3af}
 .rvl-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:1rem}
 .rvl-title{font-size:15px;font-weight:500}
 .rvl-head button{font-size:12px}
 .rvl-empty{text-align:center;color:#6b7280;font-size:13px;padding:2.5rem 0}
-.rvl-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:0.5px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px}
+.rvl-run{width:100%;margin-bottom:1rem}
+.rvl-item{border:0.5px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px;overflow:hidden}
+.rvl-item-top{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;cursor:pointer}
 .rvl-main{flex:1;min-width:0}
 .rvl-meta{font-size:11px;color:#9ca3af;margin-bottom:3px}
 .rvl-text{font-size:13px;line-height:1.55;margin-bottom:4px}
 .rvl-status{font-size:11px;color:#d97706}
+.rvl-tap{color:#9ca3af}
+.rvl-item.open .rvl-tap{display:none}
 .rvl-del{font-size:11px;color:#dc2626;border-color:#fca5a5;padding:5px 10px;white-space:nowrap}
+.rvl-answer{display:none;padding:10px 13px;border-top:0.5px solid #f0f0f0;background:#f9fafb}
+.rvl-item.open .rvl-answer{display:block}
+.rvl-ans-ttl{font-size:11px;font-weight:500;color:#059669;margin-bottom:3px}
+.rvl-ans-val{font-size:13px;font-weight:500;margin-bottom:6px}
+.rvl-ans-exp{font-size:12px;line-height:1.55;color:#4b5563}
 .sc{text-align:center;padding:1.5rem 0.5rem}
 .sc-num{font-size:48px;font-weight:500;margin:.75rem 0 .5rem}
 .sc-lbl{font-size:14px;color:#6b7280;margin-bottom:1.25rem}
@@ -135,7 +148,7 @@ button:disabled{opacity:.4;cursor:default}
     </select>
   </div>
   <div class="pbar"><div class="pfill" id="progress" style="width:0%"></div></div>
-  <div class="stats-row">
+  <div class="stats-row" id="stats-row">
     <div class="stat"><div class="stat-n" id="s-ok" style="color:#059669">0</div><div class="stat-l">正解</div></div>
     <div class="stat"><div class="stat-n" id="s-ng" style="color:#dc2626">0</div><div class="stat-l">不正解</div></div>
     <div class="stat" id="stat-done"><div class="stat-n" id="s-done" style="color:#0f766e">0/0</div><div class="stat-l">完了済み</div></div>
@@ -284,6 +297,8 @@ function setSummaryVisible(show){
   const er=document.getElementById('stat-rv');
   if(ed) ed.style.display=d;
   if(er) er.style.display=d;
+  const row=document.getElementById('stats-row');
+  if(row) row.classList.toggle('hud-compact', !show);
 }
 
 // ── HUD ──
@@ -322,7 +337,6 @@ function renderQ(){
   document.getElementById('qc').innerHTML=
     `<div class="q-meta">${TH[q.theme]||q.theme} / 問題 ${pos+1}</div>
      <div class="q-text">${q.text}</div>
-     ${isOx?'<div class="hint" style="font-size:12px;color:#6b7280;margin-bottom:.75rem">正しければ○、誤っていれば×を選択してください</div>':''}
      <div class="choices">${q.choices.map(c=>
        `<div class="choice" data-key="${c.key}" onclick="pick('${c.key}')">
           <span class="ck">${c.key}</span><span class="ct">${c.text}</span>
@@ -419,7 +433,6 @@ function answer(){
          ${wHTML}
          ${isOk?`<div class="rv-add">
              <button id="rvAddBtn" onclick="addToReview('${q.id}')">🔖 この問題を復習に追加</button>
-             <span class="rv-add-hint">勘で正解した問題も復習できます</span>
            </div>`:''}
        </div>
      </div>${rvNote}`;
@@ -429,7 +442,9 @@ function answer(){
   sbtn.disabled=false;
   sbtn.onclick=nextQ;
   updateHUD();
-  document.getElementById('expl').scrollIntoView({behavior:'smooth',block:'start'});
+  // PC(マウス環境)は画面に余裕があるためスクロールしない。スマホ等のみ解説を先頭へ
+  const isPC=window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+  if(!isPC) document.getElementById('expl').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function nextQ(){ pos++; renderQ(); }
@@ -533,13 +548,25 @@ function showReviewList(){
     const q=byId(id);
     const remain=Math.max(0, wrongMap[id].target-now);
     const status=remain>0 ? 'あと'+remain+'問で出題' : '次回セッションで出題';
+    // 正解の表示(○×は選択肢テキスト、三択は「番号. テキスト」)
+    const ansText=q.correct.map(k=>{
+      const c=q.choices.find(ch=>ch.key===k);
+      return c ? (q.type==='ox' ? c.text : k+'. '+c.text) : k;
+    }).join(' / ');
     return `<div class="rvl-item">
-        <div class="rvl-main">
-          <div class="rvl-meta">${TH[q.theme]||q.theme} ・ ${DL[q.diff]||''}</div>
-          <div class="rvl-text">${q.text}</div>
-          <div class="rvl-status">${status}</div>
+        <div class="rvl-item-top" onclick="this.parentElement.classList.toggle('open')">
+          <div class="rvl-main">
+            <div class="rvl-meta">${TH[q.theme]||q.theme} ・ ${DL[q.diff]||''}</div>
+            <div class="rvl-text">${q.text}</div>
+            <div class="rvl-status">${status}<span class="rvl-tap"> ・ タップで正解 ▾</span></div>
+          </div>
+          <button class="rvl-del" onclick="event.stopPropagation();removeFromReview('${id}')">外す</button>
         </div>
-        <button class="rvl-del" onclick="removeFromReview('${id}')">外す</button>
+        <div class="rvl-answer">
+          <div class="rvl-ans-ttl">正解</div>
+          <div class="rvl-ans-val">${ansText}</div>
+          <div class="rvl-ans-exp">${q.explanation}</div>
+        </div>
       </div>`;
   }).join('');
 
@@ -549,9 +576,21 @@ function showReviewList(){
          <span class="rvl-title">復習待ちリスト（${ids.length}問）</span>
          <button onclick="buildSession()">← 学習に戻る</button>
        </div>
-       ${ids.length ? rows
+       ${ids.length
+         ? `<button class="btn-p rvl-run" onclick="startReviewSession()">復習だけ連続で解く（${ids.length}問）→</button>${rows}`
          : '<div class="rvl-empty">復習待ちの問題はありません。</div>'}
      </div>`;
+}
+
+// 復習待ちの問題だけを連続で出題する(スケジュール・分野を無視して全件)
+function startReviewSession(){
+  const wrongMap=getWrong();
+  const ids=Object.keys(wrongMap).filter(id=>byId(id));
+  if(ids.length===0){ showReviewList(); return; }
+  sesScore=0; sesWrong=0; pos=0;
+  queue=shuffle(ids).map(id=>({q: byId(id), isRv:true}));
+  updateHUD();
+  renderQ();
 }
 
 function removeFromReview(id){
